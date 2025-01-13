@@ -12,7 +12,6 @@ $(document).ready(function () {
         // mostrarResultado(results);
         $('#resultado').html(`Todavía no hace nada este botón, pero debería hacer los tres pasos seguidos xd`);
     });
-
     /* Al dar click al botón con id="btn-parsear" */
     $('#btn-parsear').on('click', function(){
         const regexp = $('#regexp').val().trim(); // Tomar la expresión regular que ingreso el usuario
@@ -51,14 +50,47 @@ $(document).ready(function () {
                 throw new Error('El autómata generado no tiene estado inicial.');
             } else if (!afnd.final){
                 throw new Error('El autómata generado no tiene estado final.');
-
+            } else{
+                console.log('Autómata generado correctamente.');
             }
-            // console.log('AFND: '+ JSON.stringify(afnd);
-            console.log('AFND: '+ visualizeAFND(afnd));
+
+            const seen = new WeakSet();
+            const serializedAFND = JSON.stringify(afnd, (key, value) => {
+                if (typeof value === 'object' && value !== null) {
+                    if (seen.has(value)) {
+                        return; // Evita referencias circulares
+                    }
+                    seen.add(value);
+                }
+                return value;
+            });
+            // console.log('Serialized AFND:', serializedAFND);
+            $('#resultado').html(`<p>${serializedAFND}</p>`);
+
+            // Comienza desde el estado inicial del AFND
+            if (afnd && afnd.inicial) {
+                const seen = new WeakSet();
+                $('#resultado').append("Información del AFND a partir del estado inicial:<br>");
+                $('#resultado').append(`Estado inicial: ${afnd.inicial.id}<br>Estado final ${afnd.final.id}<br>`);
+                imprimirEstado(afnd.inicial, seen);
+                // $('#resultado').append(`<pre>${imprimirEstado(afnd.inicial, seen)}</pre>`);
+            } else {
+                console.error("El AFND no tiene un estado inicial definido.");
+            }
+
+
+            // console.log('Visualize AFND: <br>'+ visualizeAFND(afnd));
             // $('#resultado').append('Autómata Finito No Determinista');
             // $('#resultado').append(JSON.stringify(afnd));
             const afndVisualization = visualizeAFND(afnd);
-            $('#resultado').html(`<pre>${afndVisualization}</pre>`);
+            $('#resultado').append(`<br><pre>${afndVisualization}</pre><hr><strong>Epsilon Closure</strong>`);
+            try {
+                epsClosure(afnd.inicial);
+                $('#resultado').append(`${JSON.stringify(epsClosure(afnd))}`);
+            } catch (e) {
+                $('#resultado').append(`Error: epsClosure(afnd); ${e.message}`);
+            }
+
         } catch (e) {
             console.error(e);
             $('#resultado').empty();
@@ -67,6 +99,34 @@ $(document).ready(function () {
     });
 });
 
+function imprimirEstado(estado, seen) {
+
+    if (seen.has(estado)) {
+        return; // Evita procesar un estado que ya visitaste
+    }
+    seen.add(estado);
+
+    // Construir una representación no circular de las transiciones
+    const transicionesSimplificadas = {};
+    for (const [clave, estadosDestino] of Object.entries(estado.transitions)) {
+        transicionesSimplificadas[clave] = estadosDestino.map(e => e.id);
+    }
+
+    $('#resultado').append(`<br>Estado ID: ${estado.id}<br>` +
+        `Transiciones: ${JSON.stringify(transicionesSimplificadas)}<br>` +
+        // `Número de transiciones: ${Object.keys(transicionesSimplificadas).length}<br>` +
+        `Epsilon: [${estado.epsilon.map(e => (e ? e.id : "null")).join(", ")}]<br>`);
+
+    estado.epsilon.forEach((e) => {
+        if (e) imprimirEstado(e, seen); // Recursivo
+    });
+
+    Object.values(estado.transitions).forEach((transiciones) => {
+        transiciones.forEach((estadoDestino) => {
+            imprimirEstado(estadoDestino, seen);
+        });
+    });
+}
 
 
 
@@ -150,7 +210,7 @@ function thompson(regexp){
     // console.log('Dentro de thompson: '+ JSON.stringify(tree));
     const automata = thompson_recur(tree[0]);
 
-    // console.log(automata);
+    // console.log('Autómata: '+JSON.stringify(automata));
     // if (!automata) {
     //     throw new Error('Dentro de thompson: el autómata generado no existe.');
     // }
@@ -166,24 +226,28 @@ function thompson_recur(v){
     // console.log('v.type: '+v.type);
     // console.log('v.left:'+JSON.stringify(v.left));
     // console.log('v.right:'+JSON.stringify(v.right));
-    if(v.type === 'nodo'){ // Nodo terminal (carácter o ε)
+    if(v.type === 'nodo'){ /********* Nodo terminal (carácter o ε) *********/
         // console.log('v tipo nodo: '+JSON.stringify(v));
         const inicial = new State();
         const final = new State();
         if (v.value === 'ε') {
+            // console.log('Vacío');
             inicial.epsilon.push(final);
         } else {
             inicial.transitions[v.value] = [final];
         }
         return new AFND(inicial, final);
     } else if (v.type === 'union') {
-        const aut_vl = thompson_recur(v.left);
-        const aut_vr = thompson_recur(v.right);
+        const aut_vl = thompson_recur(v.left); // Hacer el autómata de Thompson para el subarbol izquierdo de la unión
+        const aut_vr = thompson_recur(v.right);// Hacer el autómata de Thompson para el subarbol derecho de la unión
+        // Crear nuevos estados inicial y final
         const inicial = new State();
         const final = new State();
+        // Agregar dos trancisiones ε al nuevo estado inicial que apunten a los estados iniciales de cada subarbol de la unión.
         inicial.epsilon.push(aut_vl.inicial, aut_vr.inicial);
+        //
         aut_vl.final.epsilon.push(final);
-        aut_vr.final.epsilon.push(final);
+        aut_vr.final.epsilon.push(final); 
         return new AFND(inicial, final); 
     } else if (v.type === 'concat') {
         const aut_vl = thompson_recur(v.left);
@@ -196,11 +260,39 @@ function thompson_recur(v){
         const inicial = new State();
         const final = new State();
         inicial.epsilon.push(aut_vs.inicial, final);
+        // console.log(`aut_vs.inicial.id: ${aut_vs.inicial.id}\naut_vs.final.id: ${aut_vs.final.id}`);
         aut_vs.final.epsilon.push(aut_vs.inicial,final);
+        // console.log(`Epsilon de inicial: [${inicial.epsilon.map(e => (e ? e.id : "null")).join(", ")}]\n`);
+        // console.log(`Epsilon de aut_vs.final: [${aut_vs.final.epsilon.map(e => (e ? e.id : "null")).join(", ")}]\n`);
+        
         return new AFND(inicial,final);
     }
     
 }
+
+function epsClosure(estado) {
+    const closure = new Set(); // Usamos un Set para evitar duplicados
+    const stack = [estado]; // Pila para manejar los estados pendientes de procesar
+
+    while (stack.length > 0) {
+        const actual = stack.pop();
+
+        if (!closure.has(actual)) {
+            closure.add(actual); // Añadimos el estado actual a la cerradura
+
+            // Recorremos las transiciones epsilon y añadimos los estados alcanzables
+            actual.epsilon.forEach((e) => {
+                if (e) { // Ignorar estados null en las transiciones
+                    stack.push(e);
+                }
+            });
+        }
+    }
+
+    // Convertimos el Set a un array ordenado por ID para mayor claridad
+    return Array.from(closure).sort((a, b) => a.id - b.id);
+}
+
 
 function convertirAFNDaDFA(afn) {
     return { transitions: [] }; // Estructura final de las transiciones

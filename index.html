@@ -25,7 +25,7 @@
                 </h2>
                 <div id="collapse-definiciones" class="accordion-collapse collapse" aria-labelledby="heading-definiciones">
                     <div class="accordion-body">
-                        <em>Expresión regular:</em> una expresión regular es una cadena sobre el conjunto Σ U {ε , | , · , * , ( , )}<br>
+                        <em>Expresión regular:</em> una expresión regular es una cadena sobre el conjunto Σ ∪ {ε , | , · , * , ( , )}<br>
                         <em>Operadores:</em>
                         <ul>
                             <li><strong>Concatenación (·):</strong> Combina dos expresiones, una seguida de la otra.</li>
@@ -115,10 +115,17 @@
                         El AFD es una versión simplificada del AFND que no permite transiciones ambiguas: para cada estado y símbolo, existe como máximo una transición.
                         
                         Pasos del Algoritmo:
-                        Se agrupan los estados alcanzables por transiciones ε en conjuntos, llamados "clausura ε".
-                        Cada conjunto de estados del AFND se convierte en un único estado en el AFD.
-                        Se eliminan las transiciones ε y se redirigen las transiciones basadas en los símbolos de entrada.
-                        Los estados finales del AFND determinan los estados finales del AFD.
+                        <ul class="list-group list-group-numbered">
+                            <li class="list-group-item border-0">
+                                Se agrupan los estados alcanzables por transiciones ε en conjuntos, llamados "clausura ε".
+                            </li>
+                            <li class="list-group-item border-0">
+                                Cada conjunto de estados del AFND se convierte en un único estado en el AFD.
+                            </li>
+                            <li class="list-group-item border-0">
+                                Se eliminan las transiciones ε y se redirigen las transiciones basadas en los símbolos de entrada.
+                            </li>
+                        </ul>
                         Ventaja del AFD:
                         El AFD es más eficiente para realizar búsquedas porque no requiere explorar múltiples caminos simultáneamente.
                     </div>
