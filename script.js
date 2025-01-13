@@ -7,27 +7,29 @@ $(document).ready(function () {
             alert('Por favor ingresa una expresión regular');
             return;
         }
-
-        // TODO: Llama a las funciones para construir el AFN y convertirlo a AFD
+        //Hacer todo: Llama a las funciones para construir el AFN y convertirlo a AFD
         // const results = thompsonToAFD(regexp);
         // mostrarResultado(results);
+        $('#resultado').html(`Todavía no hace nada este botón, pero debería hacer los tres pasos seguidos xd`);
     });
+
+    /* Al dar click al botón con id="btn-parsear" */
     $('#btn-parsear').on('click', function(){
-        const regexp = $('#regexp').val().trim();
+        const regexp = $('#regexp').val().trim(); // Tomar la expresión regular que ingreso el usuario
         if (!regexp) {
             alert('Por favor ingresa una expresión regular válida');
             return;
         }
         
         try {
-            const [parsedTree] = parse(regexp+"$", 0);
-            const treeHtml = renderTree(parsedTree);
-            $('#resultado').empty();
-            $('#resultado').html(`<ul>${treeHtml}</ul>`); 
-            console.log('Parseo: '+ JSON.stringify(parsedTree));
+            const [parsedTree] = parse(regexp+"$", 0); // construir el árbol pareado. Se agrega '$' a la regexp para indicar el final y se pasa la posición inicial '0'
+            const treeHtml = renderTree(parsedTree); // Construir una árbol en formato de lista para mostrarlo al usuario.
+            $('#resultado').empty(); // Limpiar la sección de resultado por si había algo anteriormente
+            $('#resultado').html(`<ul>${treeHtml}</ul>`); // Agregar el árbol a la sección de resultados
+            console.log('Parseo: '+ JSON.stringify(parsedTree)); // Mostrar el arreglo que regresa la función parse() en la consola
             $('#resultado').append('Parseo completado con éxito');
-            $('#resultado').append(JSON.stringify(parsedTree));
-        } catch (e) {
+            $('#resultado').append(JSON.stringify(parsedTree)); // el arreglo también se muestra en la sección de resultados
+        } catch (e) { // Si hay un error en el bloque try el error se muestra en consola y en la sección de resultados
             console.error(e);
             $('#resultado').empty();
             $('#resultado').text('Error durante el parseo: ' + e.message);
@@ -35,7 +37,6 @@ $(document).ready(function () {
     });
     $('#btn-afnd').on('click', function(){
         idState = 0;
-
         const regexp = $('#regexp').val().trim();
         if (!regexp) {
             alert('Por favor ingresa una expresión regular válida');
