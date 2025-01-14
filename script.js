@@ -83,11 +83,26 @@ $(document).ready(function () {
                 // $('#resultado').append('Autómata Finito No Determinista');
                 // $('#resultado').append(JSON.stringify(afnd));
             */
-            const afd = convertirAFNDaAFD(afnd);
+            
+
+
             const afndVisualization = visualizeAFND(afnd);
             $('#resultado').append(`<br><pre>${afndVisualization}</pre><hr><strong>Epsilon Closure</strong>`);
             try {
-                console.log(procesarAFND(afnd));
+                const afd = convertirAFNDaAFD(afnd);
+                // $('#resultado').append(afd);
+                // console.log(afd);
+                $('#resultado').append("AFD generado:");
+                Object.entries(afd).forEach(([estadoId, estado]) => {
+                    $('#resultado').append(`<br>Estado ${estadoId}:`);
+                    $('#resultado').append(`<br>\u2003Closure: [${estado.closure.map(e => e.id).join(", ")}]`);
+                    $('#resultado').append(`<br>\u2003Transiciones:`);
+                    Object.entries(estado.transitions).forEach(([letra, destino]) => {
+                        $('#resultado').append(`<br>\u2003\u2003Con '${letra}' -> Estado ${destino}`);
+                    });
+                    $('#resultado').append(`<br>\u2003Final: ${estado.final ? "Sí" : "No"}`);
+                });
+                // console.log(procesarAFND(afnd));
             } catch (e) {
                 $('#resultado').append(`Error: epsClosure(afnd); ${e.message}`);
             }
@@ -151,8 +166,14 @@ function convertirAFNDaAFD(afnd) {
     }
 
     // Identificar estados finales del AFD
+    // Object.values(afd).forEach((estadoAfd) => {
+    //     estadoAfd.final = estadoAfd.closure.some((estado) => estado.final); // Verificar si algún estado de la clausura es final
+    // });
+
     Object.values(afd).forEach((estadoAfd) => {
-        estadoAfd.final = estadoAfd.closure.some((estado) => estado.final); // Verificar si algún estado de la clausura es final
+        estadoAfd.final = estadoAfd.closure.some((estado) =>
+            afnd.final.id === estado.id // Verifica si el ID del estado pertenece a los finales del AFND
+        );
     });
 
     console.log("AFD generado:", afd);
