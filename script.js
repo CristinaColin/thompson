@@ -10,6 +10,7 @@ let pasoActual = -1;
 $(document).ready(function () {
     $('#btn-avanzar').on('click', function(){ avanzarPaso() });
     $('#btn-retroceder').on('click', function(){ retrocederPaso() });
+    $('#btn-final').on('click', function(){ avanzarPasoFinal() });
     $('#btn-generar').on('click',function () {
         const regexp = $('#regexp').val().trim();
         if (!regexp) {
@@ -23,7 +24,7 @@ $(document).ready(function () {
         try {
             const [parsedTree] = parse(regexp+"$", 0); // construir el árbol pareado. Se agrega '$' a la regexp para indicar el final y se pasa la posición inicial '0'
             $('#arbol-title').removeAttr('hidden').empty().append(`Árbol sintáctico ${regexp}`);
-            $('#notas').append(`<hr>Parseo completado con 5xito\n${JSON.stringify(parsedTree)}`); // el arreglo también se muestra en la sección de notas
+            $('#notas').append(`<hr>Parseo completado con éxito\n${JSON.stringify(parsedTree)}`); // el arreglo también se muestra en la sección de notas
         } catch (e) { // Si hay un error en el bloque try el error se muestra en consola y en la sección de resultados
             console.error(e);
             arbolSeccion.text(`Error durante el parseo: ${e.message}`);
@@ -47,71 +48,32 @@ $(document).ready(function () {
 
             const afndVisualization = visualizeAFND(afnd);
             afndSeccion.append(`<p>Estado inicial: ${afnd.inicial.id}<br>Estado final: ${afnd.final.id}</p><h6 class="mtb-2">Transiciones</h6>`);
-            afndSeccion.append(`<pre>${afndVisualization}</pre><hr><strong>Epsilon Closure</strong><br>`);
-           
-
+            afndSeccion.append(`<pre>${afndVisualization}</pre>`);
         } catch (e) {
             console.error(e);
             closureSeccion.text('Error al construir AFND: ' + e.message);
         }
 
         /********* Conversión del AFND al AFD con el algoritmo de Determinación *********/
+        let afd;
         try {
-            const afd = convertirAFNDaAFD(afnd);
+            $('#closure-title').removeAttr('hidden');
+            afd = convertirAFNDaAFD(afnd);
             imprimirClosures(afd);
+
         } catch (e) {
             closureSeccion.append(`Error: epsClosure(afnd); ${e.message}`);
         }
 
-
-    });
-
-    $('#btn-afnd').on('click', function(){
-        estado_id = 0;
-        const regexp = $('#regexp').val().trim();
-        if (!regexp) {
-            alert('Por favor ingresa una expresión regular válida');
-            return;
-        }
-        
         try {
-            const afnd = thompson(regexp);
-            if (!afnd) {
-                throw new Error('El autómata generado no existe.');
-            } else if (!afnd.inicial) {
-                throw new Error('El autómata generado no tiene estado inicial.');
-            } else if (!afnd.final){
-                throw new Error('El autómata generado no tiene estado final.');
-            } else{
-                console.log('Autómata generado correctamente.');
-            }
-
-            const afndVisualization = visualizeAFND(afnd);
-            resultadoSeccion.append(`<br><pre>${afndVisualization}</pre><hr><strong>Epsilon Closure</strong><br>`);
-            try {
-                const afd = convertirAFNDaAFD(afnd);
-                // resultadoSeccion.append(afd);
-                // console.log(afd);
-                resultadoSeccion.append(`AFD generado:<br>`);
-                Object.entries(afd).forEach(([estadoId, estado]) => {
-                    resultadoSeccion.append(`<br><strong>Estado ${estadoId}</strong>:`+
-                                    `<br>\u2003Closure: [${estado.closure.map(e => e.id).join(", ")}]`+
-                                    `<br>\u2003Transiciones:`);
-                    Object.entries(estado.transiciones).forEach(([letra, destino]) => {
-                        resultadoSeccion.append(`<br>\u2003\u2003Con '${letra}' -> Estado ${destino}`);
-                    });
-                    resultadoSeccion.append(`<br>\u2003Final: ${estado.final ? "Sí" : "No"}<br>`);
-                });
-                // console.log(procesarAFND(afnd));
-            } catch (e) {
-                resultadoSeccion.append(`Error: epsClosure(afnd); ${e.message}`);
-            }
-
+            // const afdVisualization = imprimirAFD(afd);
+            afdSeccion.append(`<pre>${imprimirAFD(afd)}</pre>`);
+            
         } catch (e) {
-            console.error(e);
-            resultadoSeccion.empty();
-            resultadoSeccion.text('Error al construir AFND: ' + e.message);
+            afdSeccion.append(`Error: afdVisualization; ${e.message}`)
         }
+
+
     });
 });
 
@@ -174,7 +136,27 @@ function convertirAFNDaAFD(afnd) {
     console.log("AFD generado:", afd);
     return afd;
 }
+function imprimirAFD(afd) {
+    let html = ''; // Inicializamos una cadena vacía para construir el HTML
 
+    const estadoInicial = Object.keys(afd).find(
+        (estado) => afd[estado]?.closure?.some((e) => e.inicial) || false
+    ) || 0; // Por defecto, el estado inicial será 0 si no se especifica
+
+    Object.entries(afd).forEach(([estado, detalles]) => {
+        const { transiciones } = detalles;
+
+        Object.entries(transiciones).forEach(([simbolo, destino]) => {
+            const isFinal = afd[destino]?.final || false; 
+            const isInicial = estado == estadoInicial;
+
+            // Agregar la línea formateada al HTML
+            html += `(<span style="color: ${isInicial ? 'green' : 'black'}">${estado}</span>, ${simbolo}, <span style="color: ${isFinal ? 'red' : 'black'}">${destino}</span>)<br>`;
+        });
+    });
+
+    return html; // Devolvemos el HTML generado
+}
 
 function imprimirClosures(afd) {
     closureSeccion.append(`AFD generado:<br>`);
@@ -188,38 +170,6 @@ function imprimirClosures(afd) {
         closureSeccion.append(`<br>\u2003Final: ${estado.final ? "Sí" : "No"}<br>`);
     });
 }
-
-
-function imprimirEstado(estado, seen) {
-
-    if (seen.has(estado)) {
-        return; // Evita procesar un estado que ya visitaste
-    }
-    seen.add(estado);
-
-    // Construir una representación no circular de las transiciones
-    const transicionesSimplificadas = {};
-    for (const [clave, estadosDestino] of Object.entries(estado.transiciones)) {
-        transicionesSimplificadas[clave] = estadosDestino.map(e => e.id);
-    }
-
-    resultadoSeccion.append(`<br>Estado ID: ${estado.id}<br>` +
-        `Transiciones: ${JSON.stringify(transicionesSimplificadas)}<br>` +
-        // `Número de transiciones: ${Object.keys(transicionesSimplificadas).length}<br>` +
-        `Epsilon: [${estado.epsilon.map(e => (e ? e.id : "null")).join(", ")}]<br>`);
-
-    estado.epsilon.forEach((e) => {
-        if (e) imprimirEstado(e, seen); // Recursivo
-    });
-
-    Object.values(estado.transiciones).forEach((transiciones) => {
-        transiciones.forEach((estadoDestino) => {
-            imprimirEstado(estadoDestino, seen);
-        });
-    });
-}
-
-
 
 function imprimirArbol(nodo) {
     if (!nodo) return '';
@@ -304,6 +254,10 @@ function guardarPaso(arbol) {
 function mostrarPaso() {
     const arbolActual = pasosArbol[pasoActual];
     arbolSeccion.html(`<div class='mt-4 mb-1'>${imprimirArbol(arbolActual)}</div>`);
+}
+function avanzarPasoFinal(){
+    pasoActual = pasosArbol.length - 1;
+    mostrarPaso();
 }
 function avanzarPaso() {
     if (pasoActual < pasosArbol.length - 1) {
