@@ -2,6 +2,7 @@ let estado_id = 0;
 let resultadoSeccion = $('#resultado-seccion');
 let arbolSeccion = $('#arbol-seccion');
 let afndSeccion = $('#afnd-seccion');
+let closureSeccion = $('#closure-seccion');
 let afdSeccion = $('#afd-seccion');
 let pasosArbol = [];
 let pasoActual = -1;
@@ -9,36 +10,62 @@ let pasoActual = -1;
 $(document).ready(function () {
     $('#btn-avanzar').on('click', function(){ avanzarPaso() });
     $('#btn-retroceder').on('click', function(){ retrocederPaso() });
-
     $('#btn-generar').on('click',function () {
         const regexp = $('#regexp').val().trim();
         if (!regexp) {
             alert('Por favor ingresa una expresión regular');
             return;
         }
-        resultadoSeccion.html(`Todavía no hace nada este botón, pero debería hacer los tres pasos seguidos xd`);
-    });
-    /* Al dar click al botón con id="btn-parsear" */
-    $('#btn-parsear').on('click', function(){
+        /***************** Crear el árbol sintáctico *****************/
         pasoActual = -1;
-        const regexp = $('#regexp').val().trim(); // Tomar la expresión regular que ingresó el usuario
-        if (!regexp) {
-            alert('Por favor ingresa una expresión regular');
-            return;
-        }
-        $('#btn-avanzar').removeAttr('hidden');
-        $('#btn-retroceder').removeAttr('hidden');
-        
+        $('#btns-arbol').removeAttr('hidden');
+        arbolSeccion.empty();
         try {
             const [parsedTree] = parse(regexp+"$", 0); // construir el árbol pareado. Se agrega '$' a la regexp para indicar el final y se pasa la posición inicial '0'
-            $('#arbol-title').removeAttr('hidden').append(` ${regexp}`);
-            arbolSeccion.empty();
-            $('#notas').append(`<hr>Parseo completado con 5xito\n${JSON.stringify(parsedTree)}`); // el arreglo también se muestra en la sección de resultados
+            $('#arbol-title').removeAttr('hidden').empty().append(`Árbol sintáctico ${regexp}`);
+            $('#notas').append(`<hr>Parseo completado con 5xito\n${JSON.stringify(parsedTree)}`); // el arreglo también se muestra en la sección de notas
         } catch (e) { // Si hay un error en el bloque try el error se muestra en consola y en la sección de resultados
             console.error(e);
-            resultadoSeccion.text(`Error durante el parseo: ${e.message}`);
+            arbolSeccion.text(`Error durante el parseo: ${e.message}`);
         }
+
+        /***************** Creación de Autómata Finito No Determinista *****************/
+        let afnd;
+        try {
+            afnd = thompson(regexp);
+            afndSeccion.empty();
+            $('#afnd-title').removeAttr('hidden').empty().append(`Construcción de Thompson<br><h6>Autómata Finito No Determinista</h6>`);
+            if (!afnd) {
+                throw new Error('El autómata generado no existe.');
+            } else if (!afnd.inicial) {
+                throw new Error('El autómata generado no tiene estado inicial.');
+            } else if (!afnd.final){
+                throw new Error('El autómata generado no tiene estado final.');
+            } else{
+                console.log('Autómata finito no determinista generado correctamente.');
+            }
+
+            const afndVisualization = visualizeAFND(afnd);
+            afndSeccion.append(`<p>Estado inicial: ${afnd.inicial.id}<br>Estado final: ${afnd.final.id}</p><h6 class="mtb-2">Transiciones</h6>`);
+            afndSeccion.append(`<pre>${afndVisualization}</pre><hr><strong>Epsilon Closure</strong><br>`);
+           
+
+        } catch (e) {
+            console.error(e);
+            closureSeccion.text('Error al construir AFND: ' + e.message);
+        }
+
+        /********* Conversión del AFND al AFD con el algoritmo de Determinación *********/
+        try {
+            const afd = convertirAFNDaAFD(afnd);
+            imprimirClosures(afd);
+        } catch (e) {
+            closureSeccion.append(`Error: epsClosure(afnd); ${e.message}`);
+        }
+
+
     });
+
     $('#btn-afnd').on('click', function(){
         estado_id = 0;
         const regexp = $('#regexp').val().trim();
@@ -90,10 +117,10 @@ $(document).ready(function () {
 
 function convertirAFNDaAFD(afnd) {
     const alfabeto = new Set(); // Alfabeto del AFND
-    const afd = {}; // Representación del AFD
-    const procesados = new Map(); // Map para asociar clausuras con IDs
+    const afd = {};
+    const procesados = new Map();
     const pendientes = []; // Clausuras pendientes de procesar
-    let estado_id = 0; // Contador de estados del AFD
+    let estado_id = 0;
 
     // Clausura inicial del AFND
     const closureInicial = epsClosure(afnd.inicial);
@@ -112,14 +139,14 @@ function convertirAFNDaAFD(afnd) {
 
         actualClosure.forEach((estado) => {
             Object.keys(estado.transiciones).forEach((letra) => {
-                alfabeto.add(letra); // Registrar el alfabeto dinámicamente
+                alfabeto.add(letra);
 
                 const nuevosEstados = [];
                 estado.transiciones[letra].forEach((destino) => {
                     nuevosEstados.push(...epsClosure(destino));
                 });
 
-                const nuevaClausura = Array.from(new Set(nuevosEstados)).sort((a, b) => a.id - b.id); // Eliminar duplicados
+                const nuevaClausura = Array.from(new Set(nuevosEstados)).sort((a, b) => a.id - b.id); 
 
                 if (nuevaClausura.length > 0) {
                     const clausuraKey = nuevaClausura.map(e => e.id).sort().join(',');
@@ -138,14 +165,9 @@ function convertirAFNDaAFD(afnd) {
         });
     }
 
-    // Identificar estados finales del AFD
-    // Object.values(afd).forEach((estadoAfd) => {
-    //     estadoAfd.final = estadoAfd.closure.some((estado) => estado.final); // Verificar si algún estado de la clausura es final
-    // });
-
     Object.values(afd).forEach((estadoAfd) => {
         estadoAfd.final = estadoAfd.closure.some((estado) =>
-            afnd.final.id === estado.id // Verifica si el ID del estado pertenece a los finales del AFND
+            afnd.final.id === estado.id // Ver si algún estado de la clausura en final 
         );
     });
 
@@ -154,35 +176,16 @@ function convertirAFNDaAFD(afnd) {
 }
 
 
-function procesarAFND(afnd) {
-    let EstadosAfd =0;
-    const closureInicial = epsClosure(afnd.inicial);
-    const procesados = new Set(); // No repetir estados
-    const afd = {};
-
-    closureInicial.forEach((estado) => {
-        if (procesados.has(estado.id)) return; // Evita reprocesar estados
-        procesados.add(estado.id);
-
-        // Mostrar la clausura del estado actual
-        const closure = epsClosure(estado);
-        console.log(`Closure-${estado.id}: [${closure.map(e => e.id).join(", ")}]`);
-        resultadoSeccion.append(`<br>Closure-${estado.id}: [${closure.map(e => e.id).join(", ")}]`);
-        afd.id = EstadosAfd++;
-        afd.closure = closure;
-
-        // Recorrer todas las transiciones del estado
-        Object.keys(estado.transiciones).forEach((letra) => {
-            estado.transiciones[letra].forEach((estadoDestino) => {
-                console.log(`Transición de ${estado.id} con '${letra}': ${estadoDestino.id}`);
-                resultadoSeccion.append(`<br>Transición de ${estado.id} con '${letra}': ${estadoDestino.id}`);
-
-                // Mostrar la clausura del estado destino
-                const closureDestino = epsClosure(estadoDestino);
-                console.log(`${estadoDestino.id}: Closure: [${closureDestino.map(e => e.id).join(", ")}]`);
-                resultadoSeccion.append(`<br>${estadoDestino.id}: Closure: [${closureDestino.map(e => e.id).join(", ")}]`);
-            });
+function imprimirClosures(afd) {
+    closureSeccion.append(`AFD generado:<br>`);
+    Object.entries(afd).forEach(([estadoId, estado]) => {
+        closureSeccion.append(`<br><strong>Estado ${estadoId}</strong>:`+
+                        `<br>\u2003Closure: [${estado.closure.map(e => e.id).join(", ")}]`+
+                        `<br>\u2003Transiciones:`);
+        Object.entries(estado.transiciones).forEach(([letra, destino]) => {
+            closureSeccion.append(`<br>\u2003\u2003Con '${letra}' -> Estado ${destino}`);
         });
+        closureSeccion.append(`<br>\u2003Final: ${estado.final ? "Sí" : "No"}<br>`);
     });
 }
 
@@ -425,7 +428,7 @@ function mostrarResultado(afd) {
 function visualizeAFND(afnd) {
     const visitado = new Set();
     const queue = [afnd.inicial];
-    let vista = `Estado inicial: ${afnd.inicial.id}\nEstado final ${afnd.final.id}\n\nTransiciones\n\n`;
+    let vista ='';
 
     while (queue.length > 0) {
         const estado = queue.shift();

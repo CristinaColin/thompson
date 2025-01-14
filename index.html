@@ -58,7 +58,7 @@
             <div class="accordion-item">
                 <h2 class="accordion-header" id="heading-tres">
                     <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-tres" aria-expanded="false" aria-controls="collapse-tres">
-                    <strong>4.- Construcciones de Thompson (AFND)</strong>
+                    <strong>2.- Construcciones de Thompson (AFND)</strong>
                     </button>
                 </h2>
                 <div id="collapse-tres" class="accordion-collapse collapse" aria-labelledby="heading-tres">
@@ -136,13 +136,15 @@
         <hr>
 
 
-        <div class="mt-3 mb-3">
+        <div class="mtb-3 w-50">
             <label for="regexp" class="form-label">Ingresa una expresión regular</label>
-            <input type="text" id="regexp" class="form-control w-25" value="(a|b).(c*)" placeholder="Ejemplo: (a|b).(c*)">
+            <div class="d-flex justify-content-between align-items-center">
+                <input type="text" id="regexp" class="form-control me-2 w-75" value="(a|b).(c*)" placeholder="Ejemplo: (a|b).(c*)">
+                <button id="btn-generar" class="btn btn-primary w-auto">Generar AFD</button>
+            </div>
         </div>
-        <button id="btn-generar" class="btn btn-primary">Generar AFD</button>
-        <button id="btn-parsear" class="btn btn-secondary">Parsear Regex</button>
-        <button id="btn-afnd" class="btn btn-warning">Generar AFND</button>
+        <!-- <button id="btn-parsear" class="btn btn-secondary">Parsear Regex</button> -->
+        <!-- <button id="btn-afnd" class="btn btn-warning">Generar AFND</button> -->
         
         <hr>
         <h2 class="mt-5">Resultados</h2>
@@ -150,9 +152,15 @@
             <div class="row">
                 <div class="col">
                     <hr>
-                    <button id="btn-retroceder" class="btn btn-secondary" hidden><i class="bi bi-chevron-double-left"></i></button>
-                    <button id="btn-avanzar" class="btn btn-secondary" hidden><i class="bi bi-chevron-double-right"></i></button>
-                    <h5 class="mt-3" id="arbol-title" hidden>Árbol sintáctico</h3>
+                    <h5 class="mt-3" id="arbol-title" hidden></h3>
+                    <div id="btns-arbol" hidden>
+                        <button id="btn-inicio" class="btn btn-sm btn-secondary"><i class="bi bi-chevron-bar-left"></i></button>
+                        <button id="btn-retroceder" class="btn btn-sm btn-secondary"><i class="bi bi-chevron-left"></i></button>
+                        <button id="btn-avanzar" class="btn btn-sm btn-secondary"><i class="bi bi-chevron-right"></i></button>
+                        <button id="btn-final" class="btn btn-sm btn-secondary"><i class="bi bi-chevron-bar-right"></i></button>
+                    </div>
+                    
+
                     <div id="arbol-seccion"></div>
                 </div>
                 <div class="col">
@@ -162,12 +170,18 @@
                 </div>
                 <div class="col">
                     <hr>
-                    <h5 class="mt-3" id="afd-title" hidden>AFD</h3>
-                    <div id="afd-seccion"></div>
+                    <h5 class="mt-3" id="closure-title" hidden>Closure</h3>
+                    <div id="closure-seccion"></div>
                 </div>
+                
             </div>
+            <div>
+                <hr>
+                <h5 class="mt-3" id="afd-title" hidden>Autómata Finito Determinista</h3>
+                <div id="afd-seccion"></div>
+            </div>
+            <div id="notas"></div>
         </div>
-        <div id="notas"></div>
     </div>
     <script src="script.js"></script>
 </body>
