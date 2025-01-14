@@ -223,23 +223,23 @@ function imprimirArbol(nodo) {
 
     switch (nodo.type) {
         case 'nodo':
-            return `<li>Node: ${nodo.value}</li>`;
+            return `<li><em>Nodo</em>: ${nodo.value}</li>`;
         case 'concat':
-            return `<li>Concatenación
+            return `<li><strong>Concatenación (·)</strong>
                         <ul>
                             ${imprimirArbol(nodo.left)}
                             ${imprimirArbol(nodo.right)}
                         </ul>
                     </li>`;
         case 'union':
-            return `<li>Unión
+            return `<li><strong>Unión (|)</strong>
                         <ul>
                             ${imprimirArbol(nodo.left)}
                             ${imprimirArbol(nodo.right)}
                         </ul>
                     </li>`;
         case 'star':
-            return `<li>Star
+            return `<li><strong>Estrella de Kleene (*)</strong>
                         <ul>${imprimirArbol(nodo.operando)}</ul>
                     </li>`;
         default:
