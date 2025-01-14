@@ -1,6 +1,7 @@
 let idState = 0;
 
 $(document).ready(function () {
+    let resultado = $('#resultado');
     $('#btn-generar').on('click',function () {
         const regexp = $('#regexp').val().trim();
         if (!regexp) {
@@ -53,40 +54,40 @@ $(document).ready(function () {
             } else{
                 console.log('Autómata generado correctamente.');
             }
-
-            const seen = new WeakSet();
-            const serializedAFND = JSON.stringify(afnd, (key, value) => {
-                if (typeof value === 'object' && value !== null) {
-                    if (seen.has(value)) {
-                        return; // Evita referencias circulares
-                    }
-                    seen.add(value);
-                }
-                return value;
-            });
-            // console.log('Serialized AFND:', serializedAFND);
-            $('#resultado').html(`<p>${serializedAFND}</p>`);
-
-            // Comienza desde el estado inicial del AFND
-            if (afnd && afnd.inicial) {
+            /*
                 const seen = new WeakSet();
-                $('#resultado').append("Información del AFND a partir del estado inicial:<br>");
-                $('#resultado').append(`Estado inicial: ${afnd.inicial.id}<br>Estado final ${afnd.final.id}<br>`);
-                imprimirEstado(afnd.inicial, seen);
-                // $('#resultado').append(`<pre>${imprimirEstado(afnd.inicial, seen)}</pre>`);
-            } else {
-                console.error("El AFND no tiene un estado inicial definido.");
-            }
+                const serializedAFND = JSON.stringify(afnd, (key, value) => {
+                    if (typeof value === 'object' && value !== null) {
+                        if (seen.has(value)) {
+                            return; // Evita referencias circulares
+                        }
+                        seen.add(value);
+                    }
+                    return value;
+                });
+                // console.log('Serialized AFND:', serializedAFND);
+                $('#resultado').html(`<p>${serializedAFND}</p>`);
 
+                // Comienza desde el estado inicial del AFND
+                // if (afnd && afnd.inicial) {
+                //     const seen = new WeakSet();
+                //     $('#resultado').append("Información del AFND a partir del estado inicial:<br>");
+                //     $('#resultado').append(`Estado inicial: ${afnd.inicial.id}<br>Estado final ${afnd.final.id}<br>`);
+                //     imprimirEstado(afnd.inicial, seen);
+                //     // $('#resultado').append(`<pre>${imprimirEstado(afnd.inicial, seen)}</pre>`);
+                // } else {
+                //     console.error("El AFND no tiene un estado inicial definido.");
+                // }
 
-            // console.log('Visualize AFND: <br>'+ visualizeAFND(afnd));
-            // $('#resultado').append('Autómata Finito No Determinista');
-            // $('#resultado').append(JSON.stringify(afnd));
+                // console.log('Visualize AFND: <br>'+ visualizeAFND(afnd));
+                // $('#resultado').append('Autómata Finito No Determinista');
+                // $('#resultado').append(JSON.stringify(afnd));
+            */
+            const afd = convertirAFNDaAFD(afnd);
             const afndVisualization = visualizeAFND(afnd);
             $('#resultado').append(`<br><pre>${afndVisualization}</pre><hr><strong>Epsilon Closure</strong>`);
             try {
-                epsClosure(afnd.inicial);
-                $('#resultado').append(`${JSON.stringify(epsClosure(afnd))}`);
+                console.log(procesarAFND(afnd));
             } catch (e) {
                 $('#resultado').append(`Error: epsClosure(afnd); ${e.message}`);
             }
@@ -98,6 +99,99 @@ $(document).ready(function () {
         }
     });
 });
+
+function convertirAFNDaAFD(afnd) {
+    const alfabeto = new Set(); // Alfabeto del AFND
+    const afd = {}; // Representación del AFD
+    const procesados = new Map(); // Map para asociar clausuras con IDs
+    const pendientes = []; // Clausuras pendientes de procesar
+    let idEstado = 0; // Contador de estados del AFD
+
+    // Clausura inicial del AFND
+    const closureInicial = epsClosure(afnd.inicial);
+    const inicialId = idEstado++;
+    procesados.set(closureInicial.map(e => e.id).sort().join(','), {
+        id: inicialId,
+        closure: closureInicial,
+    });
+    pendientes.push(closureInicial);
+
+    while (pendientes.length > 0) {
+        const actualClosure = pendientes.shift(); // Procesar la siguiente clausura
+        const actualId = procesados.get(actualClosure.map(e => e.id).sort().join(',')).id;
+
+        afd[actualId] = { transitions: {}, closure: actualClosure };
+
+        actualClosure.forEach((estado) => {
+            Object.keys(estado.transitions).forEach((letra) => {
+                alfabeto.add(letra); // Registrar el alfabeto dinámicamente
+
+                const nuevosEstados = [];
+                estado.transitions[letra].forEach((destino) => {
+                    nuevosEstados.push(...epsClosure(destino));
+                });
+
+                const nuevaClausura = Array.from(new Set(nuevosEstados)).sort((a, b) => a.id - b.id); // Eliminar duplicados
+
+                if (nuevaClausura.length > 0) {
+                    const clausuraKey = nuevaClausura.map(e => e.id).sort().join(',');
+                    if (!procesados.has(clausuraKey)) {
+                        const nuevoId = idEstado++;
+                        procesados.set(clausuraKey, {
+                            id: nuevoId,
+                            closure: nuevaClausura,
+                        });
+                        pendientes.push(nuevaClausura);
+                    }
+
+                    afd[actualId].transitions[letra] = procesados.get(clausuraKey).id;
+                }
+            });
+        });
+    }
+
+    // Identificar estados finales del AFD
+    Object.values(afd).forEach((estadoAfd) => {
+        estadoAfd.final = estadoAfd.closure.some((estado) => estado.final); // Verificar si algún estado de la clausura es final
+    });
+
+    console.log("AFD generado:", afd);
+    return afd;
+}
+
+
+function procesarAFND(afnd) {
+    let statesAfd =0;
+    const closureInicial = epsClosure(afnd.inicial);
+    const procesados = new Set(); // No repetir estados
+    const afd = {};
+
+    closureInicial.forEach((estado) => {
+        if (procesados.has(estado.id)) return; // Evita reprocesar estados
+        procesados.add(estado.id);
+
+        // Mostrar la clausura del estado actual
+        const closure = epsClosure(estado);
+        console.log(`Closure-${estado.id}: [${closure.map(e => e.id).join(", ")}]`);
+        $('#resultado').append(`<br>Closure-${estado.id}: [${closure.map(e => e.id).join(", ")}]`);
+        afd.id = statesAfd++;
+        afd.closure = closure;
+
+        // Recorrer todas las transiciones del estado
+        Object.keys(estado.transitions).forEach((letra) => {
+            estado.transitions[letra].forEach((estadoDestino) => {
+                console.log(`Transición de ${estado.id} con '${letra}': ${estadoDestino.id}`);
+                $('#resultado').append(`<br>Transición de ${estado.id} con '${letra}': ${estadoDestino.id}`);
+
+                // Mostrar la clausura del estado destino
+                const closureDestino = epsClosure(estadoDestino);
+                console.log(`${estadoDestino.id}: Closure: [${closureDestino.map(e => e.id).join(", ")}]`);
+                $('#resultado').append(`<br>${estadoDestino.id}: Closure: [${closureDestino.map(e => e.id).join(", ")}]`);
+            });
+        });
+    });
+}
+
 
 function imprimirEstado(estado, seen) {
 
@@ -271,26 +365,24 @@ function thompson_recur(v){
 }
 
 function epsClosure(estado) {
-    const closure = new Set(); // Usamos un Set para evitar duplicados
-    const stack = [estado]; // Pila para manejar los estados pendientes de procesar
+    const closure = new Set(); // Set evita duplicados
+    const stack = [estado]; // Pila de estados pendientes
 
     while (stack.length > 0) {
         const actual = stack.pop();
 
         if (!closure.has(actual)) {
-            closure.add(actual); // Añadimos el estado actual a la cerradura
+            closure.add(actual); // 
 
-            // Recorremos las transiciones epsilon y añadimos los estados alcanzables
-            actual.epsilon.forEach((e) => {
-                if (e) { // Ignorar estados null en las transiciones
+            actual.epsilon.forEach((e) => { // transiciones epsilon del estado actual
+                if (e) { // Ignorar estados null 
                     stack.push(e);
                 }
             });
         }
     }
 
-    // Convertimos el Set a un array ordenado por ID para mayor claridad
-    return Array.from(closure).sort((a, b) => a.id - b.id);
+    return Array.from(closure);
 }
 
 
@@ -334,9 +426,9 @@ function visualizeAFND(afnd) {
             vista += `State ${estado.id} --${symbol}--> ${estados.map(s => s.id).join(', ')}\n`;
             queue.push(...estados);
         }
-        for (const epsilonState of estado.epsilon) {
-            vista += `State ${estado.id} --ε--> ${epsilonState.id}\n`;
-            queue.push(epsilonState);
+        for (const estadoEpsilon of estado.epsilon) {
+            vista += `State ${estado.id} --ε--> ${estadoEpsilon.id}\n`;
+            queue.push(estadoEpsilon);
         }
     }
 
@@ -346,7 +438,7 @@ function visualizeAFND(afnd) {
 class State {
     constructor() {
         this.id = idState++; // Asignar un ID único al estado
-        this.transitions = {}; // { 'a': [estado1, estado2] }
+        this.transitions = {}; // { 'a': [1, 2] }
         this.epsilon = []; // Transiciones epsilon
     }
 }
