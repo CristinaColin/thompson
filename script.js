@@ -283,18 +283,24 @@ function renderTree(nodo) {
 }
 
 function parse(p, last = 0) {
-    let v = null; // Inicializat árbol vacío
+    let v = null; // Inicializar árbol vacío
     while (p.charAt(last) !== '$') {
         const current = p.charAt(last);
 
         if (/^[a-zA-Z0-9]$/.test(current) || current === 'ε') { // Caracter normal
             const vr = { type: 'nodo', value: current };
             if (v) {
-                v = { type: 'concat', left: v, right: vr };
+                throw new Error(
+                    `<br>Carácter inesperado: ${current}.`
+                );
             } else {
                 v = vr;
             }
             last++;
+        } else if (current === '.') { // Operador explícito de concatenación
+            const [vr, newLast] = parse(p, last + 1);
+            v = { type: 'concat', left: v, right: vr };
+            last = newLast;
         } else if (current === '|') { // Operador OR
             const [vr, newLast] = parse(p, last + 1);
             v = { type: 'union', left: v, right: vr };
@@ -306,7 +312,9 @@ function parse(p, last = 0) {
             const [vr, newLast] = parse(p, last + 1);
             last = newLast + 1;
             if (v) {
-                v = { type: 'concat', left: v, right: vr };
+                throw new Error(
+                    `Use . para concatenar.`
+                );
             } else {
                 v = vr;
             }
@@ -319,6 +327,7 @@ function parse(p, last = 0) {
 
     return [v, last];
 }
+
 
 function thompson(regexp){
     const tree = parse(regexp+"$", 0);
