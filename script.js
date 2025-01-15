@@ -46,7 +46,7 @@ $(document).ready(function () {
                 console.log('Autómata finito no determinista generado correctamente.');
             }
 
-            const afndVisualization = visualizeAFND(afnd);
+            const afndVisualization = imprimirAFND(afnd);
             afndSeccion.append(`<p>Estado inicial: ${afnd.inicial.id}<br>Estado final: ${afnd.final.id}</p><h6 class="mtb-2">Transiciones</h6>`);
             afndSeccion.append(`<pre>${afndVisualization}</pre>`);
         } catch (e) {
@@ -59,7 +59,7 @@ $(document).ready(function () {
         try {
             $('#closure-title').removeAttr('hidden');
             afd = convertirAFNDaAFD(afnd);
-            imprimirClosures(afd);
+            imprimirClosures(afd.afd);
 
         } catch (e) {
             closureSeccion.append(`Error: epsClosure(afnd); ${e.message}`);
@@ -67,7 +67,12 @@ $(document).ready(function () {
 
         try {
             // const afdVisualization = imprimirAFD(afd);
-            afdSeccion.append(`<pre>${imprimirAFD(afd)}</pre>`);
+            $('#afd-title').removeAttr('hidden');
+            afdSeccion.empty().append(`
+                <p>Estado inicial: ${afd.estadoInicial}</p>
+                <p>Estados finales: ${afd.estadosFinales.join(', ')}</p>
+            `);
+            afdSeccion.append(`<pre>${imprimirAFD(afd.afd)}</pre>`);
             
         } catch (e) {
             afdSeccion.append(`Error: afdVisualization; ${e.message}`)
@@ -83,8 +88,9 @@ function convertirAFNDaAFD(afnd) {
     const procesados = new Map();
     const pendientes = []; // Clausuras pendientes de procesar
     let estado_id = 0;
+    const estadosFinales = [];
+    let estadoInicial = null;
 
-    // Clausura inicial del AFND
     const closureInicial = epsClosure(afnd.inicial);
     const inicialId = estado_id++;
     procesados.set(closureInicial.map(e => e.id).sort().join(','), {
@@ -92,6 +98,7 @@ function convertirAFNDaAFD(afnd) {
         closure: closureInicial,
     });
     pendientes.push(closureInicial);
+    estadoInicial = inicialId;
 
     while (pendientes.length > 0) {
         const actualClosure = pendientes.shift(); // Procesar la siguiente clausura
@@ -108,7 +115,7 @@ function convertirAFNDaAFD(afnd) {
                     nuevosEstados.push(...epsClosure(destino));
                 });
 
-                const nuevaClausura = Array.from(new Set(nuevosEstados)).sort((a, b) => a.id - b.id); 
+                const nuevaClausura = Array.from(new Set(nuevosEstados)).sort((a, b) => a.id - b.id);
 
                 if (nuevaClausura.length > 0) {
                     const clausuraKey = nuevaClausura.map(e => e.id).sort().join(',');
@@ -127,36 +134,45 @@ function convertirAFNDaAFD(afnd) {
         });
     }
 
-    Object.values(afd).forEach((estadoAfd) => {
-        estadoAfd.final = estadoAfd.closure.some((estado) =>
-            afnd.final.id === estado.id // Ver si algún estado de la clausura en final 
-        );
-    });
+    Object.values(afd).forEach((estadoAfd, id) => {
+        const esFinal = estadoAfd.closure.some((estado) => afnd.final.id === estado.id);
+    
+        if (esFinal) {
+            estadosFinales.push(id); 
+            estadoAfd.final = true;
+        } else {
+            estadoAfd.final = false;
+        }
+    })
 
-    console.log("AFD generado:", afd);
-    return afd;
+    // console.log("AFD generado:", afd);
+    // console.log("Estado inicial:", estadoInicial);
+    // console.log("Estados finales:", estadosFinales);
+
+    return { afd, estadoInicial, estadosFinales }; // Devolver los arreglos junto con el AFD
 }
-function imprimirAFD(afd) {
-    let html = ''; // Inicializamos una cadena vacía para construir el HTML
 
-    const estadoInicial = Object.keys(afd).find(
-        (estado) => afd[estado]?.closure?.some((e) => e.inicial) || false
-    ) || 0; // Por defecto, el estado inicial será 0 si no se especifica
+function imprimirAFD(afd) {
+    let html = '';
+
+    const estadoInicial = Object.keys(afd).find((estado) =>
+        afd[estado]?.closure?.some((e) => e.inicial)
+    ) || 0; 
 
     Object.entries(afd).forEach(([estado, detalles]) => {
-        const { transiciones } = detalles;
+        const { transiciones, final } = detalles;
 
         Object.entries(transiciones).forEach(([simbolo, destino]) => {
-            const isFinal = afd[destino]?.final || false; 
+            const isFinal = afd[destino]?.final || false;
             const isInicial = estado == estadoInicial;
 
-            // Agregar la línea formateada al HTML
             html += `(<span style="color: ${isInicial ? 'green' : 'black'}">${estado}</span>, ${simbolo}, <span style="color: ${isFinal ? 'red' : 'black'}">${destino}</span>)<br>`;
         });
     });
 
     return html; // Devolvemos el HTML generado
 }
+
 
 function imprimirClosures(afd) {
     closureSeccion.append(`AFD generado:<br>`);
@@ -272,8 +288,6 @@ function retrocederPaso() {
     }
 }
 
-
-
 function thompson(regexp){
     const arbol = parse(regexp+"$", 0);
     // console.log('Dentro de thompson: '+ JSON.stringify(tree));
@@ -284,7 +298,6 @@ function thompson(regexp){
     //     throw new Error('Dentro de thompson: el autómata generado no existe.');
     // }
     return afnd;
-
 }
 
 function thompson_recur(v){
@@ -358,28 +371,9 @@ function epsClosure(estado) {
     }
 
     return Array.from(closure);
-}
+} 
 
-function mostrarResultado(afd) {
-    if (!afd) {
-        resultadoSeccion.append('<p>No se generó autómata finito determinista</p>');
-        return;
-    }
-
-    const table = $('<table class="table table-bordered"></table>');
-    table.append('<thead><tr><th>Estado Inicial</th><th>Símbolo</th><th>Estado Final</th></tr></thead>');
-
-    const tbody = $('<tbody></tbody>');
-    transiciones.forEach(({ from, symbol, to }) => {
-        const row = `<tr><td>${from}</td><td>${symbol}</td><td>${to}</td></tr>`;
-        tbody.append(row);
-    });
-
-    table.append(tbody);
-    resultadoSeccion.append(table);
-}
-
-function visualizeAFND(afnd) {
+function imprimirAFND(afnd) {
     const visitado = new Set();
     const queue = [afnd.inicial];
     let vista ='';
@@ -410,7 +404,7 @@ class Estado {
     }
 }
 
-class AFND {
+class AFND { // Solo tiene estado final y estado inicial
     constructor(inicial, final) {
         this.inicial = inicial;
         this.final = final;
