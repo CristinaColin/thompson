@@ -58,6 +58,7 @@ $(document).ready(function () {
         let afd;
         try {
             $('#closure-title').removeAttr('hidden');
+            closureSeccion.empty();
             afd = convertirAFNDaAFD(afnd);
             imprimirClosures(afd.afd);
 
